@@ -18,8 +18,8 @@ class Config(object):
         self.nbatches = 100
         self.entity = 0
         self.relation = 0
-        self.trainTimes = 1
-        self.margin = 1.0
+        self.trainTimes = 100
+        self.margin = 0.5
         self.learningRate = 0.01
         self.use_gpu = False
 
@@ -62,10 +62,16 @@ class TransE(nn.Module):
 
     def _calc(self, h, t, r):
         # TO DO: implement score function
-        # Hint: you can use F.normalize and torch.norm functions
+        # Hint: you can use torch.normalize and torch.norm functions
         if self.norm_flag: # normalize embeddings with l2 norm
-            
-        pass
+            h = F.normalize(h,p=2,dim = -1)
+            t = F.normalize(t,p=2,dim = -1)
+            r = F.normalize(r,p=2,dim = -1)
+        score = h+r-t
+        score = torch.norm(score,self.p_norm,dim = -1)
+        return score
+
+
 
     def forward(self, data):
         batch_h = data['batch_h']
@@ -84,7 +90,10 @@ class TransE(nn.Module):
     def loss(self, pos_score, neg_score):
         # TO DO: implement loss function
         # Hint: consider margin
-        pass
+        loss_func = nn.MarginRankingLoss(self.margin.item(),size_average = False)
+        y = torch.Tensor([1])
+        Loss = loss_func(neg_score,pos_score,y)
+        return Loss
         
 
 
@@ -125,7 +134,7 @@ def main():
     
     print("Finish Training")
     
-    f = open("entity2vec.txt", "w")
+    f = open("entity2vec_margin1.txt", "w")
     enb = transe.ent_embeddings.weight.data.cpu().numpy()
     for i in enb:
         for j in i:
@@ -133,7 +142,7 @@ def main():
         f.write("\n")
     f.close()
 
-    f = open("relation2vec.txt", "w")
+    f = open("relation2vec_margin1.txt", "w")
     enb = transe.rel_embeddings.weight.data.cpu().numpy()
     for i in enb:
         for j in i:
@@ -144,5 +153,4 @@ def main():
             
 if __name__ == "__main__":
     main()
-
 

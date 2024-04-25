@@ -10,11 +10,11 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s',
 
 if __name__ == '__main__':
 
-    data_path = 'text8'
+    data_path = 'D:\\study\\学习资料\\驭风计划\\4 自然语言处理\\Natural language processing\\1 Word2VecTransE\\Word2Vec\\text8'
     t = time()
 
     # loading dataset
-    sents = word2vec.Text8Corpus('text8')
+    sents = word2vec.Text8Corpus(data_path)
 
     # training word2vec
     model = gensim.models.Word2Vec(sents,
