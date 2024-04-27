@@ -10,7 +10,7 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s',
 
 if __name__ == '__main__':
 
-    data_path = 'D:\\study\\学习资料\\驭风计划\\4 自然语言处理\\Natural language processing\\1 Word2VecTransE\\Word2Vec\\text8'
+    data_path = 'text8'
     t = time()
 
     # loading dataset
@@ -21,6 +21,7 @@ if __name__ == '__main__':
                                    vector_size=200,
                                    window=10,
                                    min_count=10,
+                                   epochs=10,
                                    workers=multiprocessing.cpu_count())
 
     # saving to file
