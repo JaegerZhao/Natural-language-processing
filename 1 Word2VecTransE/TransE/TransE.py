@@ -64,11 +64,10 @@ class TransE(nn.Module):
         # TO DO: implement score function
         # Hint: you can use F.normalize and torch.norm functions
         if self.norm_flag: # normalize embeddings with l2 norm
-            h = F.normalize(h,p=2,dim = 2)
-            t = F.normalize(t,p=2,dim = 2)
-            r = F.normalize(r,p=2,dim = 2)
-        score = h+r-t
-        score = torch.norm(score,self.p_norm,dim = 2)
+            h = F.normalize(h,p = self.p_norm,dim = 1)
+            t = F.normalize(t,p = self.p_norm,dim = 1)
+            r = F.normalize(r,p = self.p_norm,dim = 1)
+        score = torch.norm( h + r - t,self.p_norm,dim = 1)
         return score
 
 
