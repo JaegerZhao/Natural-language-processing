@@ -396,7 +396,61 @@ $$
 
 ​	TransE 是一种知识图谱嵌入（Knowledge Graph Embedding, KGE）模型，由 Antoine Bordes 等人在 2013 年提出。它的目标是将知识图谱中的实体（entities）和关系（relations）映射到连续的向量空间中，使得可以通过向量运算来推断实体间的关系。
 
-​	TransE 模型的核心思想是，对于一个三元组（头实体-关系-尾实体），例如 `(华盛顿，是美国的首都，美国)`，TransE 试图通过将头实体的向量与关系向量相加，然后减去尾实体的向量，来使得三元组的得分尽可能高。换句话说，TransE 模型试图在向量空间中捕捉头实体和尾实体通过关系相连的事实。
+​	TransE 模型的核心思想是，对于一个三元组（头实体h-关系r-尾实体t），例如 `(华盛顿，首都，美国)`，TransE 试图通过将头实体的向量与关系向量相加，然后减去尾实体的向量，来使得三元组的得分尽可能高。换句话说，TransE 模型试图在向量空间中捕捉头实体和尾实体通过关系相连的事实。
 
+![1714295744875](https://raw.githubusercontent.com/ZzDarker/figure/main/img/1714295744875.jpg)
 
+### 3.2 代码实现
 
+​	实验给了一个 TransE 模型训练和评估的代码，需要补齐 `_calc` , `loss` 方法的代码。
+
+1. 配置类（ `Config`）
+
+   定义了模型训练的超参数，包括范数类型、隐藏层大小、批次数量、实体和关系的总数、训练次数、边界值、学习率以及是否使用GPU。
+
+   ```py
+   class Config(object):
+   
+       def __init__(self):
+           self.p_norm = 1
+           self.hidden_size = 50
+           self.nbatches = 100
+           self.entity = 0
+           self.relation = 0
+           self.trainTimes = 100
+           self.margin = 0.5
+           self.learningRate = 0.01
+           self.use_gpu = False
+   ```
+
+   根据是否使用GPU，将numpy数组转换为PyTorch的`Variable`对象，以便在GPU上进行计算。
+
+   ```py
+   def to_var(x, use_gpu):
+   		if use_gpu:
+   			return Variable(torch.from_numpy(x).cuda())
+   		else:
+   			return Variable(torch.from_numpy(x))
+   ```
+
+2. TransE模型类 （`TransE`）
+
+   该代码继承自`torch.nn.Module`，实现TransE模型的核心逻辑。
+
+   - 得分函数（`_calc`）
+
+     根据 头实体h ，尾实体t 和 关系r 的嵌入向量，计算TransE的得分函数。
+
+     ```py
+     def _calc(self, h, t, r):
+         # TO DO: implement score function
+         # Hint: you can use F.normalize and torch.norm functions
+         if self.norm_flag: # normalize embeddings with l2 norm
+         h = F.normalize(h,p = self.p_norm,dim = 1)
+         t = F.normalize(t,p = self.p_norm,dim = 1)
+         r = F.normalize(r,p = self.p_norm,dim = 1)
+         score = torch.norm( h + r - t,self.p_norm,dim = 1)
+         return score
+     ```
+
+     
