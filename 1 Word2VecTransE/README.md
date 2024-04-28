@@ -402,7 +402,7 @@ $$
 
 ### 3.2 代码实现
 
-​	实验给了一个 TransE 模型训练和评估的代码，需要补齐 `_calc` , `loss` 方法的代码。
+​	实验给了一个 TransE 模型训练和评估的代码 `TransE.py`，需要补齐 `_calc` , `loss` 方法的代码。
 
 1. 配置类（ `Config`）
 
@@ -439,7 +439,7 @@ $$
 
    - 得分函数（`_calc`）
 
-     根据 头实体h ，尾实体t 和 关系r 的嵌入向量，计算TransE的得分函数。
+     根据 **头实体h** ，**尾实体t** 和 **关系r** 的嵌入向量，计算TransE的得分函数。
 
      ```py
      def _calc(self, h, t, r):
@@ -453,4 +453,319 @@ $$
          return score
      ```
 
+   - 前向传播（`forward`）
+
+     定义了模型的前向传播过程，接受输入数据，计算得分。
+
+     ```py
+     def forward(self, data):
+         batch_h = data['batch_h']
+         batch_t = data['batch_t']
+         batch_r = data['batch_r']
+         h = self.ent_embeddings(batch_h)
+         t = self.ent_embeddings(batch_t)
+         r = self.rel_embeddings(batch_r)
+         score = self._calc(h ,t, r)
+         return score
+     ```
+
+   - 预测函数（`predict`）
+
+     通过前向传播将模型的预测得分转换为numpy数组并返回。
+
+     ```py
+     def predict(self, data):
+         score = self.forward(data)
+         return score.cpu().data.numpy()
+     ```
+
+   - 损失函数（`loss`）
+
+     实现了带有边界的损失函数，使用ReLU激活函数确保损失值非负。
+
+     ```py
+     def loss(self, pos_score, neg_score):
+         # TO DO: implement loss function
+         # Hint: consider margin
+         return torch.nn.ReLU()(self.margin + (pos_score - neg_score).mean())
+     ```
+
+3. 主函数（`main`）
+
+   - 创建配置对象和数据加载器`PyTorchTrainDataLoader`。
+
+     ```py
+     config = Config()
+     train_dataloader = PyTorchTrainDataLoader(
+                             in_path = "./data/", 
+                             nbatches = config.nbatches,
+                             threads = 8)
+     ```
+
+   - 实例化TransE模型，并根据配置设置其参数。
+
+     ```py
+     transe = TransE(
+             ent_tot = train_dataloader.get_ent_tot(),
+             rel_tot = train_dataloader.get_rel_tot(),
+             dim = config.hidden_size, 
+             p_norm = config.p_norm, 
+             norm_flag = True,
+             margin=config.margin)
+     ```
+
+   - 选择优化器，如果是GPU环境则迁移模型到GPU上。
+
+     ```py
+     optimizier = optim.SGD(transe.parameters(), lr=config.learningRate)
      
+     if config.use_gpu:
+         transe.cuda()
+     ```
+
+   - 迭代训练
+
+     每次迭代都通过数据加载器获取数据，计算损失，执行反向传播并更新模型参数。
+
+     ```py
+     for times in range(config.trainTimes):
+         ep_loss = 0.
+         for data in train_dataloader:
+             optimizier.zero_grad()
+             score = transe({
+                     'batch_h': to_var(data['batch_h'], config.use_gpu).long(),
+                     'batch_t': to_var(data['batch_t'], config.use_gpu).long(),
+                     'batch_r': to_var(data['batch_r'], config.use_gpu).long()})
+             pos_score, neg_score = score[0], score[1]
+             loss = transe.loss(pos_score, neg_score)
+             loss.backward()
+             optimizier.step()
+             ep_loss += loss.item()
+         print("Epoch %d | loss: %f" % (times+1, ep_loss))
+     
+     print("Finish Training")
+     ```
+
+   - 训练完成后，将实体和关系的嵌入向量保存到文本文件中。
+
+     ```py
+     f = open("entity2vec_margin1.txt", "w")
+     enb = transe.ent_embeddings.weight.data.cpu().numpy()
+     for i in enb:
+         for j in i:
+             f.write("%f\t" % (j))
+         f.write("\n")
+     f.close()
+     
+     f = open("relation2vec_margin1.txt", "w")
+     enb = transe.rel_embeddings.weight.data.cpu().numpy()
+     for i in enb:
+         for j in i:
+             f.write("%f\t" % (j))
+         f.write("\n")
+     f.close()
+     ```
+
+### 3.3 项目训练
+
+​	本次项目是在本地进行训练，下面介绍具体训练流程。
+
+1. 数据集
+
+   本实验采用 **wikidata数据集** ，包含大量的数据项和关系，构成了庞大的三元组集合，这些三元组由主语（实体）、谓语（关系）和宾语（实体或值）组成。
+
+   - **entity2id**（实体到ID的映射）
+
+     一个具有50000行的实体到ID映射的数据集，以Q开头的 **wikidata实体** 与其对应ID组成，内容如下。
+
+     ```
+     50000
+     Q18285162	38039
+     Q209118	47236
+     Q24297027	36800
+     Q312001	46250
+     Q18844919	34546
+     ...
+     ```
+
+     其中可以根据以下格式网址 `https://www.wikidata.org/wiki/Q30` ，查找以Q开头实体表示的具体内容。
+
+   - **relation2id**（关系到ID的映射）
+
+     一个具有378行的关系到ID映射的数据集，以P开头的 **wikidata关系** 与其对应ID组成，内容如下。
+
+     ```
+     378
+     P126	278
+     P2789	261
+     P541	353
+     P1462	183
+     P2388	311
+     ...
+     ```
+
+     其中可以根据以下格式网址 `https://www.wikidata.org/wiki/Property:P36` ，查找以P开头关系表示的具体内容。
+
+   - **triple2id**（三元组到ID的映射）
+
+     一个具有299291行的三元组（头实体、关系、尾实体）数据集，由三列ID组成，第一列为头实体ID，第二列为尾实体ID，第三列为关系ID。
+
+     ```
+     299291
+     49082	10984	0
+     49082	47288	0
+     49082	230	1
+     49082	21973	2
+     49082	217	2
+     ...
+     ```
+
+     可以映射表找到ID表示内容，如第一行头实体ID为 *49082* 映射到 *Q23*，在wikidata表示为 *George Washington*；尾实体ID为 *10984* 映射到 *Q40949*，在wikidata表示为 *American Revolutionary War*；关系ID为 *0* 映射到 *P607*，在wikidata表示为 *conflict*。第一行的即表示了(*George Washington, conflict, American Revolutionary War*) 的三元组，表示了 **乔治华盛顿** 与 **美国独立战争** 的关系是 **军事冲突** 。
+
+2. 代码训练
+
+   采用基础参数进行训练，训练100轮次，执行以下指令，运行 `TransW.py` 代码，开始训练。
+
+   ```py
+   python TransE.py
+   ```
+
+   训练结果如下。
+
+   ![image-20240429014537925](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429014537925.png)
+
+   一个训练了100轮，从第一轮的 loss 值46.278254，下降到最后一轮的0.016592，用折线图表示如下。
+
+   ![image-20240429014752507](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429014752507.png)
+
+   可以看到经过100轮训练，loss值有效的下降。
+
+   训练结束后，得到两个文件 `entity2vec_margin1.txt` 与 `relation2vec_margin1.txt` 分别保存了实体和关系的向量表示。
+
+### 3.4 项目测试
+
+1. 代码设计
+
+   可以通过将头实体的向量与关系向量相加，然后减去尾实体的向量，来计算三元组的得分，以下为测试代码。
+
+   - 初始化模型
+
+     ```py
+     #初始化模型
+     config = Config()
+     train_dataloader = PyTorchTrainDataLoader(
+                                 in_path = "./data/", 
+                                 nbatches = config.nbatches,
+                                 threads = 8)
+         
+     transe = TransE(
+                 ent_tot = train_dataloader.get_ent_tot(),
+                 rel_tot = train_dataloader.get_rel_tot(),
+                 dim = config.hidden_size, #50
+                 p_norm = config.p_norm, 
+                 norm_flag = True,
+                 margin=config.margin)
+     ```
+
+   - 初始化wikidata词条与embedding序号之间的字典
+
+     ```py
+     #初始化wikidata词条与embedding序号之间的字典
+     ent_dic = {}
+     rel_dic = {}
+     f = open('./data/entity2id.txt','r')
+     next(f)
+     for index in range(train_dataloader.get_ent_tot()):
+         value,key = f.readline().strip().split()
+         ent_dic[int(key)] = value
+     f = open('./data/relation2id.txt','r')
+     next(f)
+     for index in range(train_dataloader.get_rel_tot()):
+         value,key = f.readline().strip().split()
+         rel_dic[int(key)] = value
+     ```
+
+   - 载入预训练的embedding参数
+
+     将预先训练好的嵌入参数（embeddings）加载到TransE模型中。
+
+     ```py
+     #载入预训练的embedding参数
+     ent_data = np.loadtxt('entity2vec_margin1.txt')
+     rel_data = np.loadtxt('relation2vec_margin1.txt')
+     ent_data = torch.Tensor(ent_data)
+     rel_data = torch.Tensor(rel_data)
+     transe.ent_embeddings = transe.ent_embeddings.from_pretrained(ent_data)
+     transe.rel_embeddings = transe.rel_embeddings.from_pretrained(rel_data)
+     ```
+
+2. 代码测试
+
+   根据以下两个案例，对训练得到的模型进行测试。
+
+   - **给定头实体Q30，关系P36，最接近的尾实体是哪些？**
+
+     查询 wikidata 网址，Q30为 *United States of America*，P36 为 *capital* 。预测尾实体代码如下：
+
+     ```py
+     #预测Q30+P36最接近的尾实体
+     data = {'batch_h':torch.LongTensor([list(ent_dic.keys())[list(ent_dic.values()).index('Q30')]]),
+             'batch_r':torch.LongTensor([list(rel_dic.keys())[list(rel_dic.values()).index('P36')]]),
+             'batch_t':torch.LongTensor([i for i in range(train_dataloader.get_ent_tot())])}
+     
+     score = transe.predict(data)
+     for index in score.argsort()[0:10]:
+         print(ent_dic[index])
+     ```
+
+     以上代码采用预测函数 `transe.predict(data)` ，得到前10个最匹配的尾实体，结果如下所示：
+
+     ![image-20240429021138080](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429021138080.png)
+
+     | 实体ID |            含义            | 解释                                                      |
+     | :----: | :------------------------: | :-------------------------------------------------------- |
+     |  Q20   |           Norway           | country in Northern Europe                                |
+     | Q34266 |       Russian Empire       | former empire in Eurasia and North America (1721–1917)    |
+     |  Q29   |           Spain            | country in southwestern Europe with territories in Africa |
+     | Q33946 |       Czechoslovakia       | country in Central Europe, 1918–1992                      |
+     | Q41304 |      Weimar Republic       | Germany in the years 1918/1919–1933                       |
+     |  Q33   |          Finland           | country in Northern Europe                                |
+     |  Q35   |          Denmark           | country in Northern Europe                                |
+     |  Q403  |           Serbia           | country in Southeast Europe                               |
+     |  Q148  | People's Republic of China | country in East Asia                                      |
+     |  Q34   |           Sweden           | country in Northern Europe                                |
+
+     可以看到，前10的实体大部分为国家，如挪威、俄罗斯等。应该得到的尾实体为Q61 华盛顿，并未在前10实体中出现，说明训练结果推测尾实体的效果并不是很好。
+
+   - **给定头实体Q30，尾实体Q49，最接近的关系是哪些？**
+
+     查询 wikidata 网址，Q30为 *United States of America*，Q49 为 *North America* 。预测关系代码如下：
+
+     ```py
+     data_1 = {'batch_h':torch.LongTensor([list(ent_dic.keys())[list(ent_dic.values()).index('Q30')]]),
+             'batch_t':torch.LongTensor([list(ent_dic.keys())[list(ent_dic.values()).index('Q49')]]),
+             'batch_r':torch.LongTensor([i for i in range(train_dataloader.get_rel_tot())])}
+     score_1 = transe.predict(data_1)
+     
+     for index in score_1.argsort()[0:10]:
+         print(rel_dic[index])
+     ```
+
+     以上代码采用预测函数 `transe.predict(data_1)` ，得到前10个最匹配的关系，结果如下所示：
+
+     ![image-20240429022739515](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429022739515.png)
+
+     | 关系ID |                    含义                     | 解释                                                         |
+     | :----: | :-----------------------------------------: | ------------------------------------------------------------ |
+     |  P30   |                  continent                  | continent of which the subject is a part                     |
+     |  P741  |                playing hand                 | hand used to play a racket sport, cricket, fencing, or curling |
+     |  P58   |                screenwriter                 | person(s) who wrote the script for subject item              |
+     |  P790  |                 approved by                 | item is approved by other item(s)                            |
+     |  P927  |             anatomical location             | where in the body or cell does this feature lie or happen    |
+     |  P123  |                  publisher                  | organization or person responsible for publishing books, periodicals, printed music, podcasts, games or software |
+     | P2321  | general classification of race participants | classification of race participants                          |
+     |  P749  |             parent organization             | parent organization of an organization, opposite of subsidiaries (P355) |
+     |  P186  |             made from material              | material the subject or the object is made of or derived from (do not confuse with P10672 which is used for processes) |
+     |  P750  |               distributed by                | distributor of a creative work; distributor for a record label; news agency; film distributor |
+
+     可以看到，排在第一位的就是 *continent* 大洲，*United States of America* 与 *North America* 的关系是美国属于北美洲，即 *continent* 这个答案很准确。
