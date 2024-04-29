@@ -19,7 +19,7 @@ class Config(object):
         self.entity = 0
         self.relation = 0
         self.trainTimes = 100
-        self.margin = 0.5
+        self.margin = 1
         self.learningRate = 0.01
         self.use_gpu = False
 
@@ -130,7 +130,7 @@ def main():
     
     print("Finish Training")
     
-    f = open("entity2vec_margin1.txt", "w")
+    f = open("entity2vec.txt", "w")
     enb = transe.ent_embeddings.weight.data.cpu().numpy()
     for i in enb:
         for j in i:
@@ -138,7 +138,7 @@ def main():
         f.write("\n")
     f.close()
 
-    f = open("relation2vec_margin1.txt", "w")
+    f = open("relation2vec.txt", "w")
     enb = transe.rel_embeddings.weight.data.cpu().numpy()
     for i in enb:
         for j in i:

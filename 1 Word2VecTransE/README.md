@@ -632,11 +632,11 @@ $$
 
    训练结果如下。
 
-   ![image-20240429014537925](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429014537925.png)
+   ![image-20240429090018579](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429090018579.png)
 
-   一个训练了100轮，从第一轮的 loss 值46.278254，下降到最后一轮的0.016592，用折线图表示如下。
+   一个训练了100轮，从第一轮的 loss 值46.879642，下降到最后一轮的0.000000，用折线图表示如下。
 
-   ![image-20240429014752507](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429014752507.png)
+   ![image-20240429085801727](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429085801727.png)
 
    可以看到经过100轮训练，loss值有效的下降。
 
@@ -769,3 +769,65 @@ $$
      |  P750  |               distributed by                | distributor of a creative work; distributor for a record label; news agency; film distributor |
 
      可以看到，排在第一位的就是 *continent* 大洲，*United States of America* 与 *North America* 的关系是美国属于北美洲，即 *continent* 这个答案很准确。
+
+### 3.5 代码改进
+
+​	改变参数`p_norm`和`margin`，重新训练模型，分析模型的变化。
+
+1. `p_norm` 对训练模型的影响
+
+   `p_norm`决定了得分函数中使用的范数类型。在TransE中，通常使用L1范数（当`p_norm=1`）或L2范数（当`p_norm=2`）。
+
+   - `p_norm=1`
+
+     L1范数（曼哈顿距离）对数据中的噪声和异常值更加鲁棒，但在优化过程中可能会导致较慢的收敛。
+
+     在最初的训练中，使用的就是`p_norm=1`，训练100轮，用折线图表示loss变化结果如下。
+
+     ![image-20240429014752507](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429014752507.png)
+
+   - `p_norm=2`
+
+     L2范数（欧几里得距离）在优化过程中通常更快收敛，但对异常值的敏感度更高。
+
+     下图为使用 `p_norm=2` 训练的结果图像，可以看到，使用L2范数收敛过程更快。
+
+     ![image-20240429123956907](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429123956907.png)
+
+     **给定头实体Q30，关系P36，尾实体预测值如下。**
+
+     ![image-20240429124648453](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429124648453.png)
+
+     结果与 `p_norm=1` 时相似，都是预测了一些国家名，如俄罗斯、英国等，没有预测出正确答案华盛顿。
+
+     **给定头实体Q30，尾实体Q49，关系预测值如下。**
+
+     ![image-20240429125023759](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429125023759.png)
+
+     结果与 `p_norm=1` 时相似，在首位就预测出了正确的关系 P30 大洲。
+
+2. `margin` 对训练模型的影响
+
+   `margin`是TransE损失函数中的一个参数，用于定义正样本和负样本之间的边界。损失函数旨在确保正样本的得分高于负样本的得分至少`margin`值。
+
+   实验给的 margin 值为0.5，下面将给出 margin 值为1的训练结果。
+
+   ![image-20240429151522663](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429151522663.png)
+
+   将 `margin=0.5` 与 `margin=1` 两组训练结果绘制在折线图中，如下图所示。
+
+   ![image-20240429151638818](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429151638818.png)
+
+   使用 `margin=1` 进行测试，结果如下。
+
+   - **给定头实体Q30，关系P36，尾实体预测值如下。**
+
+     ![image-20240429151903202](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429151903202.png)
+
+     结果与 `margin=0.5` 时相似，都是预测了一些国家名，排名第一的是 Q668 印度，没有预测出正确答案华盛顿。
+
+   - **给定头实体Q30，尾实体Q49，关系预测值如下。**
+
+     ![image-20240429151922643](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429151922643.png)
+
+     结果与 `margin=1` 时相似，在首位就预测出了正确的关系 P30 大洲。
