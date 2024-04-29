@@ -832,4 +832,4 @@ $$
 
      ![image-20240429151922643](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240429151922643.png)
 
-     结果与 `margin=1` 时相似，在首位就预测出了正确的关系 P30 大洲。
+     结果与 `margin=0.5` 时相似，在首位就预测出了正确的关系 P30 大洲。
