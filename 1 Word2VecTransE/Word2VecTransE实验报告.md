@@ -1,4 +1,4 @@
-# 作业一 Word2Vec&TranE的实现
+# 作业一 Word2Vec&TransE的实现
 
 ## 1 任务目标
 
@@ -91,6 +91,8 @@ $$
 [2] https://radimrehurek.com/gensim/models/word2vec.html
 
 [3] A uniﬁed model for word sense representation and disambiguation. in Proceedings of EMNLP, 2014.
+
+[4] [rayo61/NLP-training1-word2vec-TransE: This is the experiment and report of NLP training course of Xuetangzaixian (github.com)](https://github.com/rayo61/NLP-training1-word2vec-TransE/tree/main)
 
 ## 2 Word2Vec 实现
 
