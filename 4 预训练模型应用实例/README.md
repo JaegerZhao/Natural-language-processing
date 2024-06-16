@@ -191,6 +191,66 @@
    │      train_bert_token.npy
    ```
 
+### 2.3 代码问题回答
+
+​	在数据预处理代码中用 *# question* 标识了多个问题，下面根据代码内容与查阅资料进行回答。
+
+1. 这里的`fact_in_annotated_train`代表什么？
+
+   ```py
+   if is_training:
+       for n1 in vertexSet[label['h']]:
+           for n2 in vertexSet[label['t']]:
+               fact_in_annotated_train.add((n1['name'], n2['name'], rel))
+   else:
+       for n1 in vertexSet[label['h']]:
+           for n2 in vertexSet[label['t']]:
+                   if (n1['name'], n2['name'], rel) in fact_in_annotated_train:
+                       label['in_annotated_train'] = True
+   ```
+
+   `fact_in_annotated_train` 集合用于存储在训练数据中出现的关系三元组（即实体对和它们之间的关系）。这可以用于在训练期间识别哪些关系在训练集中是可见的，并在评估时确定一个关系是否被模型在训练数据中观察到。
+
+2. 这里的`na_triple`代表什么？
+
+   ```py
+   na_triple = []
+   for j in range(len(vertexSet)):
+       for k in range(len(vertexSet)):
+           if (j != k):
+               if (j, k) not in train_triple:
+                   na_triple.append((j, k))
+   
+   ```
+
+   `na_triple` 是一个列表，包含数据集中不存在的关系对（即负样本）。这些是模型不应该预测为任何关系的实体对。在关系抽取任务中，除了正样本之外，负样本的包含有助于训练模型识别非关系。
+
+3. 这里的`bert_starts_ends`代表什么？
+
+   ```py
+   bert_starts_ends = np.ones((sen_tot, max_seq_length, 2), dtype = np.int64) * (max_seq_length - 1)
+   ```
+
+   `bert_starts_ends` 是一个三维数组，用于存储每个句子中每个词对应的子词的起始和结束索引。这个信息对于模型理解词在经过分词器处理后如何在子词级别上分解是很重要的。在 BERT 模型中，这有助于正确地对齐词和它们对应的嵌入。
+
+4. `token_start_idxs`的公式中为什么要加1
+
+   ```py
+   token_start_idxs = 1 + np.cumsum([0] + subword_lengths[:-1])
+   ```
+
+   `token_start_idxs` 加1 是为了在子词的起始索引之前插入一个特殊的标记（如 `[CLS]`），这是 BERT 模型的开始标记。这样，`token_start_idxs` 就包含了从句子开始到每个子词的累积长度。
+
+5. 为什么要把`token_start_idxs >= max_seq_length-1`的都置为`max_seq_length - 1`
+
+   ```py
+   token_start_idxs[token_start_idxs >= max_seq_length-1] = max_seq_length - 1
+   token_end_idxs = 1 + np.cumsum(subword_lengths)
+   token_end_idxs[token_end_idxs >= max_seq_length-1] = max_seq_length - 1
+   ```
+
+   这个操作是为了确保所有超出最大序列长度的 token 的起始索引不会超出数组的界限。BERT 模型要求所有 token 的索引必须在有效的范围内，因此这个操作将超出范围的索引设置为最后一个有效位置。
+
 ## 3 项目训练
 
 ### 3.1 代码介绍
