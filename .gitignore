@@ -1,2 +1,3 @@
 */__pycache__/
 /2 seq2seq/model_storage
+/3 情感分析案例/data/wiki-news-300d-1M.vec
