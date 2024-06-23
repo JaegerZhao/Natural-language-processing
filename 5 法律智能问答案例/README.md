@@ -260,32 +260,211 @@
 
 ### 3.3 模型训练
 
-​	输入以下命令进行模型训练。
+1. 训练指令
 
-```py
-!python baseline/run_cail.py \
-    --name chinese-bert-wwm \
-    --bert_model ./models/chinese_bert_wwm \
-    --data_dir ./output/data/chinese-bert-wwm \
-    --batch_size 2 \
-    --eval_batch_size 32 \
-    --lr 1e-5 \
-    --gradient_accumulation_steps 4 \
-    --seed 56 \
-    --epochs 25
-```
+   ​	输入以下命令进行模型训练，本实验分别对以上4个中文预训练模型进行训练。
 
-​	其中参数含义如下：
+   ```py
+   !python baseline/run_cail.py \
+       --name chinese-bert-wwm \
+       --bert_model ./models/chinese_bert_wwm \
+       --data_dir ./output/data/chinese-bert-wwm \
+       --batch_size 2 \
+       --eval_batch_size 32 \
+       --lr 1e-5 \
+       --gradient_accumulation_steps 4 \
+       --seed 56 \
+       --epochs 25
+   ```
 
-- `--name chinese-bert-wwm`: `--name` 指定了运行此次实验的名称或标识，这里设置为 `chinese-bert-wwm`。
-- `--bert_model ./models/chinese_bert_wwm`: 指定BERT模型的路径。
-- `--data_dir ./output/data/chinese-bert-wwm`: 指定存放数据的目录，数据可能包括预处理后的训练集、验证集等。
-- `--batch_size 2`: 设置训练时每个batch的大小为2。
-- `--eval_batch_size 32`: 设置评估时每个batch的大小为32。
-- `--lr 1e-5`: 设置学习率为 `1e-5`，即0.00001。
-- `--gradient_accumulation_steps 4`: 设置梯度累积的步数为4，这意味着每4个batch执行一次优化器更新。
-- `--seed 56`: 设置随机种子为56，以确保结果的可复现性。
-- `--epochs 25`: 设置训练的总周期数为25。
+   ​	其中参数含义如下：
+
+   - `--name chinese-bert-wwm`: `--name` 指定了运行此次实验的名称或标识，这里设置为 `chinese-bert-wwm`。
+   - `--bert_model ./models/chinese_bert_wwm`: 指定BERT模型的路径。
+   - `--data_dir ./output/data/chinese-bert-wwm`: 指定存放数据的目录，数据可能包括预处理后的训练集、验证集等。
+   - `--batch_size 2`: 设置训练时每个batch的大小为2。
+   - `--eval_batch_size 32`: 设置评估时每个batch的大小为32。
+   - `--lr 1e-5`: 设置学习率为 `1e-5`，即0.00001。
+   - `--gradient_accumulation_steps 4`: 设置梯度累积的步数为4，这意味着每4个batch执行一次优化器更新。
+   - `--seed 56`: 设置随机种子为56，以确保结果的可复现性。
+   - `--epochs 25`: 设置训练的总周期数为25。
+
+2. 训练结果
+
+   训练结束后，得到了每个epoch的`.pth`的 `checkpoints` 文件与`.json`的 `submissions` 文件，用于后续模型测试。
 
 ## 4 模型测试
+
+### 4.1 模型测试指标
+
+​	在自然语言处理（NLP）和信息检索领域，EM、F1、Prec和Recall是几个关键的性能评估指标，它们用于衡量模型预测结果的质量。以下是每个指标的详细介绍：
+
+1. **Exact Match (EM) - 精确匹配**:
+   - 精确匹配是衡量预测答案是否与真实答案完全一致的指标。如果两个答案的文本完全相同，那么它们被认为是精确匹配的。
+   - 例如，如果真实答案是 "New York"，预测答案也是 "New York"，则EM为1（或100%）；如果预测答案是 "New york" 或 "纽约"，则EM为0，因为它们与真实答案不完全相同。
+
+2. **F1 Score (F1) - F1 分数**:
+   - F1分数是精确度（Precision）和召回率（Recall）的调和平均数，用于衡量模型的准确性和完整性的平衡。F1分数的范围是0到1，1表示完美的预测，0表示最差的预测。
+   - 公式为：
+     $$
+     F1 = 2 \times \left(\frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}\right)
+     $$
+   - F1分数特别适用于处理不平衡的数据集，其中某些类别的样本可能比其他类别多得多。
+
+3. **Precision (Prec) - 精确度**:
+
+   - 精确度是指预测为正类别中实际为正类别的比例。换句话说，它衡量了所有被模型预测为正确答案中，实际上也是正确答案的比例。
+   - 公式为：
+     $$
+     \text{Precision} = \frac{TP}{TP + FP}
+     $$
+   - 其中TP（真正例）是正确预测为正的样本数量，FP（假正例）是错误预测为正的样本数量。
+
+4. **Recall (Recall) - 召回率**:
+   - 召回率也称为真正率或灵敏度，它衡量了所有实际正类别中被模型正确预测为正类别的比例。
+   - 公式为：
+     $$
+     \text{Recall} = \frac{TP}{TP + FN}
+     $$
+   - 其中FN（假负例）是被错误预测为负的正样本数量。
+
+5. **SP (Supporting Facts) 结果**:
+
+   - 支持事实是指那些直接支撑或解释答案的文本段落或句子。在多跳问答（multi-hop QA）中，答案通常需要依据文档中的多个不同部分进行推理得出，这些不同的部分即为支持事实。
+   - 在评估脚本中，`update_sp` 函数用于计算模型预测的支持事实与真实支持事实之间的匹配程度，包括精确度（Precision）、召回率（Recall）和F1分数。
+
+6. **Joint 结果**:
+
+   - Joint评估考虑了答案的准确性以及支持事实的准确性。在这种评估方式中，只有当模型同时正确预测了答案以及所有相关的支持事实时，才认为该问题是完全正确的。
+   - 例如，在`eval`函数中，计算联合精确度（joint EM）时，仅当答案的精确匹配（EM）和支持事实的精确匹配（sp_EM）同时为真时，联合精确度才计为1，这反映了模型在整体任务上的表现。
+
+### 4.2 模型测试代码
+
+​	本案例没有提供模型测试代码，通过 [CAIL2020——阅读理解](https://github.com/china-ai-law-challenge/CAIL2020/tree/master/ydlj) 得到测试代码 `evaluate.py` 。`evalutae.py` 是一个用于评估问答系统性能的Python脚本，主要用于计算精确匹配（Exact Match, EM）、F1分数以及其他相关指标。以下是对脚本中关键功能的详细介绍：
+
+1. 导入模块
+
+   - `sys`: 用于访问与Python解释器密切相关的变量和函数。
+
+   - `ujson`: 一个用于解析和生成JSON的库，比标准的`json`库更快。
+
+   - `re`: 正则表达式库，用于文本匹配。
+
+   - `string`: 包含字符串常量和字符串相关的函数。
+
+   - `collections.Counter`: 用于计数的容器，方便统计元素出现次数。
+
+   - `pickle`: 用于序列化和反序列化Python对象。
+
+2. 答案标准化函数
+   - `normalize_answer(s)`: 将答案文本进行标准化处理，包括去除文章（a, an, the）、替换空白字符、去除标点符号和转换为小写。
+
+3. 评估函数
+
+   - `f1_score(prediction, ground_truth)`: 计算预测答案和真实答案之间的F1分数，包括精确度（Precision）、召回率（Recall）和F1分数本身。
+
+   - `exact_match_score(prediction, ground_truth)`: 计算预测答案和真实答案是否完全匹配。
+
+   - `update_answer(metrics, prediction, gold)`: 更新答案评估指标，包括精确匹配、F1分数、精确度和召回率。
+
+4. 支持事实评估函数
+   - `update_sp(metrics, prediction, gold)`: 更新支持事实（Supporting Facts, SP）的评估指标，包括精确匹配、F1分数、精确度和召回率。
+
+5. 主评估函数
+   - `eval(prediction_file, gold_file)`: 读取预测结果文件和真实结果文件，然后对每个问题的答案和支持事实进行评估，计算整体的评估指标。
+
+6. 联合评估
+   - 脚本还计算了答案和支持事实的联合评估指标，即在答案精确匹配的情况下，支持事实也精确匹配的情况。
+
+7. 主函数
+   - `if __name__ == '__main__':` 块是脚本的入口点，它使用命令行参数指定的预测结果文件和真实结果文件进行评估，并打印出评估结果。
+
+### 4.3 模型测试
+
+​	输入以下指令进行模型测试，得到每个epoch的测试结果。
+
+```
+for i in range(1,26):
+    !python baseline/evaluate.py  ./output/submissions/chinese-bert-wwm/pred_seed_56_epoch_{i}_99999.json ./data/dev.json
+```
+
+​	测试结果如下：
+
+```
+{'em': 0.125, 'f1': 0.19567546419134832, 'prec': 0.2086390213622355, 'recall': 0.19941998427586816, 'sp_em': 0.15079365079365079, 'sp_f1': 0.25401549508692367, 'sp_prec': 0.3197751322751322, 'sp_recall': 0.22890211640211638, 'joint_em': 0.001984126984126984, 'joint_f1': 0.03492904180069224, 'joint_prec': 0.05480599647266315, 'joint_recall': 0.028516452877447276}
+{'em': 0.45634920634920634, 'f1': 0.5561908302303119, 'prec': 0.5700169126508411, 'recall': 0.5635363963342302, 'sp_em': 0.15674603174603174, 'sp_f1': 0.43485764676240873, 'sp_prec': 0.5851851851851851, 'sp_recall': 0.3772156084656083, 'joint_em': 0.05952380952380952, 'joint_f1': 0.25640473686157556, 'joint_prec': 0.3713905252595728, 'joint_recall': 0.2208404364186486}
+{'em': 0.49404761904761907, 'f1': 0.580694477531037, 'prec': 0.5979415040426944, 'recall': 0.5836045772516851, 'sp_em': 0.23015873015873015, 'sp_f1': 0.589451630820679, 'sp_prec': 0.6803791887125223, 'sp_recall': 0.5631283068783066, 'joint_em': 0.12103174603174603, 'joint_f1': 0.3814845473719221, 'joint_prec': 0.4563021126066761, 'joint_recall': 0.36503795669254235}
+...
+```
+
+​	分别对4个中文预训练模型进行测试，结果如下。
+
+1. chinese-bert-wwm
+
+   - 基础结果
+
+     ![image-20240624024239108](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240624024239108.png)
+
+   - SP (Supporting Facts) 结果
+
+     ![image-20240624024651256](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240624024651256.png)
+
+   - joint 结果
+
+     ![image-20240624024720473](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240624024720473.png)
+
+2. chinese_roberta_wwm_ext
+
+   - 基础结果
+
+     ![image-20240624024855837](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240624024855837.png)
+
+   - SP (Supporting Facts) 结果
+
+     ![image-20240624024909770](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240624024909770.png)
+
+   - joint 结果
+
+     ![image-20240624024921516](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240624024921516.png)
+
+3. thunlp_ms
+
+   - 基础结果
+
+     ![image-20240624025013356](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240624025013356.png)
+
+   - SP (Supporting Facts) 结果
+
+     ![image-20240624025020291](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240624025020291.png)
+
+   - joint 结果
+
+     ![image-20240624025026400](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240624025026400.png)
+
+4. thunlp_xs
+
+   - 基础结果
+
+     ![image-20240624025041745](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240624025041745.png)
+
+   - SP (Supporting Facts) 结果
+
+     ![image-20240624025049391](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240624025049391.png)
+
+   - joint 结果
+
+     ![image-20240624025058508](https://raw.githubusercontent.com/ZzDarker/figure/main/img/image-20240624025058508.png)
+
+将 4 个预训练模型训练25轮后的结果列成表格，结果如下。
+
+| 模型/指标               | em           | f1           | prec         | recall       | sp_em        | sp_f1        | sp_prec      | sp_recall    | joint_em     | joint_f1     | joint_prec   | joint_recall |
+| ----------------------- | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ |
+| chinese-bert-wwm        | **0.676587** | **0.760272** | **0.779338** | **0.766072** | 0.369048     | **0.714164** | **0.752504** | **0.718518** | **0.281746** | **0.584557** | **0.626606** | **0.593274** |
+| chinese_roberta_wwm_ext | 0.658730     | 0.731837     | 0.757250     | 0.737134     | **0.428571** | 0.749191     | 0.792477     | 0.748380     | 0.317460     | 0.585685     | 0.636313     | 0.593407     |
+| thunlp_ms               | 0.500000     | 0.585127     | 0.599209     | 0.593184     | 0.259921     | 0.611662     | 0.697354     | 0.591038     | 0.168651     | 0.395291     | 0.456952     | 0.387666     |
+| thunlp_xs               | 0.488095     | 0.573347     | 0.582891     | 0.586875     | 0.196429     | 0.576492     | 0.654889     | 0.560185     | 0.130952     | 0.374735     | 0.422532     | 0.376051     |
+
+## 5 探索和尝试
+
+​	本章使用2019年的[阅读理解数据集（CJRC）](https://github.com/china-ai-law-challenge/CAIL2019/tree/master/%E9%98%85%E8%AF%BB%E7%90%86%E8%A7%A3/data)作为辅助数据集，帮助模型提高阅读理解能力。
 
