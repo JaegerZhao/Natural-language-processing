@@ -12,7 +12,7 @@ import os
 
 
 
-
+# 定义Example类，用于存储单个问答样本的数据
 class Example(object):
 
     def __init__(self,
@@ -43,7 +43,7 @@ class Example(object):
         self.start_position = start_position
         self.end_position = end_position
 
-
+# 定义InputFeatures类，用于存储转换后的特征数据
 class InputFeatures(object):
     """A single set of features of data."""
 
@@ -85,79 +85,84 @@ class InputFeatures(object):
 
 
 
-
+# 检查答案是否在段落中
 def check_in_full_paras(answer, paras):
     full_doc = ""
     for p in paras:
         full_doc += " ".join(p[1])
     return answer in full_doc
 
-
-def read_examples( full_file):
-
+# 读取JSON格式的问答数据文件
+def read_examples(full_file):
+    # 打开并读取输入文件（JSON 格式）
     with open(full_file, 'r', encoding='utf-8') as reader:
-        full_data = json.load(reader)    
+        full_data = json.load(reader)
 
-
+    # 判断字符是否为空白字符的函数
     def is_whitespace(c):
         if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F:
             return True
         return False
 
-    cnt = 0
-    examples = []
-    for case in tqdm(full_data):   
-        key = case['_id']
-        qas_type = "" # case['type']
-        sup_facts = set([(sp[0], sp[1]) for sp in case['supporting_facts']])   
-        sup_titles = set([sp[0] for sp in case['supporting_facts']]) 
-        orig_answer_text = case['answer']
+    cnt = 0  # 统计多个答案位置的示例数量
+    examples = []  # 存储所有样本的列表
 
-        sent_id = 0
-        doc_tokens = []
-        sent_names = []
-        sup_facts_sent_id = []
-        sent_start_end_position = []
-        para_start_end_position = []
-        entity_start_end_position = []
-        ans_start_position, ans_end_position = [], []
+    # 遍历每个数据条目
+    for case in tqdm(full_data):
+        key = case['_id']  # 获取问题 ID
+        qas_type = ""  # 问题类型（这里未定义具体类型）
+        sup_facts = set([(sp[0], sp[1]) for sp in case['supporting_facts']])  # 获取支持事实
+        sup_titles = set([sp[0] for sp in case['supporting_facts']])  # 获取支持事实的段落标题
+        orig_answer_text = case['answer']  # 获取原始答案文本
 
-        JUDGE_FLAG = orig_answer_text == 'yes' or orig_answer_text == 'no' or orig_answer_text=='unknown'  or orig_answer_text=="" # judge_flag??
-        FIND_FLAG = False
+        sent_id = 0  # 句子 ID 初始化
+        doc_tokens = []  # 文档的所有词
+        sent_names = []  # 句子名称（段落标题+句子 ID）
+        sup_facts_sent_id = []  # 支持事实的句子 ID
+        sent_start_end_position = []  # 句子在文档中的起止位置
+        para_start_end_position = []  # 段落在文档中的起止位置
+        entity_start_end_position = []  # 实体在文档中的起止位置（未使用）
+        ans_start_position, ans_end_position = [], []  # 答案的起止位置
 
-        char_to_word_offset = []  # Accumulated along all sentences
-        prev_is_whitespace = True
+        # 判断是否为特殊答案类型
+        JUDGE_FLAG = orig_answer_text == 'yes' or orig_answer_text == 'no' or orig_answer_text == 'unknown' or orig_answer_text == ""
+        FIND_FLAG = False  # 是否找到答案标志
 
-        # for debug
-        titles = set()
-        para_data=case['context']
-        for paragraph in para_data:  
-            title = paragraph[0]
-            sents = paragraph[1]   
+        char_to_word_offset = []  # 字符到词的映射
+        prev_is_whitespace = True  # 上一个字符是否为空白
 
+        titles = set()  # 存储所有段落标题
+        para_data = case['context']  # 获取段落数据
 
-            titles.add(title)  
-            is_gold_para = 1 if title in sup_titles else 0  
+        # 遍历段落数据
+        for paragraph in para_data:
+            title = paragraph[0]  # 获取段落标题
+            sents = paragraph[1]  # 获取段落中的句子
 
-            para_start_position = len(doc_tokens)  
+            titles.add(title)  # 添加标题到集合
+            is_gold_para = 1 if title in sup_titles else 0  # 判断是否为支持事实段落
 
-            for local_sent_id, sent in enumerate(sents):  
-                if local_sent_id >= 100:  
-                    break
+            para_start_position = len(doc_tokens)  # 记录段落开始位置
 
-                # Determine the global sent id for supporting facts
-                local_sent_name = (title, local_sent_id)   
-                sent_names.append(local_sent_name)  
+            # 遍历段落中的句子
+            for local_sent_id, sent in enumerate(sents):
+                if local_sent_id >= 100:
+                    break  # 句子数量超过 100 则跳出
+
+                local_sent_name = (title, local_sent_id)  # 生成句子名称
+                sent_names.append(local_sent_name)  # 添加句子名称到列表
+
                 if local_sent_name in sup_facts:
-                    sup_facts_sent_id.append(sent_id)   
-                sent_id += 1   
-                sent=" ".join(sent)
-                sent += " "
+                    sup_facts_sent_id.append(sent_id)  # 添加支持事实句子 ID
 
-                sent_start_word_id = len(doc_tokens)           
-                sent_start_char_id = len(char_to_word_offset)  
+                sent_id += 1  # 增加句子 ID
+                sent = " ".join(sent) + " "  # 句子拼接并加空格
 
-                for c in sent:  
+                sent_start_word_id = len(doc_tokens)  # 记录句子开始词位置
+                sent_start_char_id = len(char_to_word_offset)  # 记录句子开始字符位置
+
+                # 遍历句子中的字符
+                for c in sent:
                     if is_whitespace(c):
                         prev_is_whitespace = True
                     else:
@@ -168,50 +173,44 @@ def read_examples( full_file):
                         prev_is_whitespace = False
                     char_to_word_offset.append(len(doc_tokens) - 1)
 
-                sent_end_word_id = len(doc_tokens) - 1  
-                sent_start_end_position.append((sent_start_word_id, sent_end_word_id))  
+                sent_end_word_id = len(doc_tokens) - 1  # 记录句子结束词位置
+                sent_start_end_position.append((sent_start_word_id, sent_end_word_id))  # 添加句子起止位置
 
-                # Answer char position
+                # 查找答案在句子中的位置
                 answer_offsets = []
                 offset = -1
-
-                tmp_answer=" ".join(orig_answer_text)
+                tmp_answer = " ".join(orig_answer_text)
                 while True:
-
                     offset = sent.find(tmp_answer, offset + 1)
                     if offset != -1:
-                        answer_offsets.append(offset)   
+                        answer_offsets.append(offset)
                     else:
                         break
 
-                # answer_offsets = [m.start() for m in re.finditer(orig_answer_text, sent)]
+                # 如果不是特殊答案且找到答案位置
                 if not JUDGE_FLAG and not FIND_FLAG and len(answer_offsets) > 0:
-                    FIND_FLAG = True   
+                    FIND_FLAG = True
                     for answer_offset in answer_offsets:
-                        start_char_position = sent_start_char_id + answer_offset   
-                        end_char_position = start_char_position + len(tmp_answer) - 1  
-                       
+                        start_char_position = sent_start_char_id + answer_offset
+                        end_char_position = start_char_position + len(tmp_answer) - 1
                         ans_start_position.append(char_to_word_offset[start_char_position])
                         ans_end_position.append(char_to_word_offset[end_char_position])
 
-
-
-               
-                if len(doc_tokens) > 382:   
-                   
+                # 如果文档词数量超过 382 则跳出
+                if len(doc_tokens) > 382:
                     break
-            para_end_position = len(doc_tokens) - 1
-            
-            para_start_end_position.append((para_start_position, para_end_position, title, is_gold_para))  
+
+            para_end_position = len(doc_tokens) - 1  # 记录段落结束位置
+            para_start_end_position.append((para_start_position, para_end_position, title, is_gold_para))  # 添加段落起止位置
 
         if len(ans_end_position) > 1:
-            cnt += 1    
-        if key <10:
+            cnt += 1  # 多答案位置示例计数
+        if key < 10:
             print("qid {}".format(key))
             print("qas type {}".format(qas_type))
             print("doc tokens {}".format(doc_tokens))
             print("question {}".format(case['question']))
-            print("sent num {}".format(sent_id+1))
+            print("sent num {}".format(sent_id + 1))
             print("sup face id {}".format(sup_facts_sent_id))
             print("para_start_end_position {}".format(para_start_end_position))
             print("sent_start_end_position {}".format(sent_start_end_position))
@@ -219,7 +218,8 @@ def read_examples( full_file):
             print("orig_answer_text {}".format(orig_answer_text))
             print("ans_start_position {}".format(ans_start_position))
             print("ans_end_position {}".format(ans_end_position))
-       
+
+        # 创建 Example 对象并添加到 examples 列表
         example = Example(
             qas_id=key,
             qas_type=qas_type,
@@ -228,22 +228,24 @@ def read_examples( full_file):
             sent_num=sent_id + 1,
             sent_names=sent_names,
             sup_fact_id=sup_facts_sent_id,
-            para_start_end_position=para_start_end_position, 
+            para_start_end_position=para_start_end_position,
             sent_start_end_position=sent_start_end_position,
             entity_start_end_position=entity_start_end_position,
             orig_answer_text=orig_answer_text,
-            start_position=ans_start_position,   
+            start_position=ans_start_position,
             end_position=ans_end_position)
         examples.append(example)
-    return examples
+
+    return examples  # 返回所有样本列表
 
 
+# 将Example对象转换为InputFeatures对象
 def convert_examples_to_features(examples, tokenizer, max_seq_length, max_query_length):
     # max_query_length = 50
 
-    features = []
-    failed = 0
-    for (example_index, example) in enumerate(tqdm(examples)):  
+    features = []   # 存储所有转换后的特征
+    failed = 0      # 统计转换失败的例子数量
+    for (example_index, example) in enumerate(tqdm(examples)):  # 遍历每个例子
         if example.orig_answer_text == 'yes':
             ans_type = 1
         elif example.orig_answer_text == 'no':
@@ -255,10 +257,10 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length, max_query_
 
         query_tokens = ["[CLS]"]
         for token in example.question_text.split(' '):
-            query_tokens.extend(tokenizer.tokenize(token))
+            query_tokens.extend(tokenizer.tokenize(token))  # 分词并添加到 query_tokens
         if len(query_tokens) > max_query_length - 1:
-            query_tokens = query_tokens[:max_query_length - 1]
-        query_tokens.append("[SEP]")
+            query_tokens = query_tokens[:max_query_length - 1]  # 截断长度超过 max_query_length 的 query_tokens
+        query_tokens.append("[SEP]")    # 添加句子结束标志
 
         # para_spans = []
         # entity_spans = []
@@ -270,23 +272,23 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length, max_query_
 
         all_doc_tokens = ["[CLS]"]   
         for token in example.question_text.split(' '):
-            all_doc_tokens.extend(tokenizer.tokenize(token))
+            all_doc_tokens.extend(tokenizer.tokenize(token))       # 分词并添加到 all_doc_tokens
         if len(all_doc_tokens) > max_query_length - 1:
-            all_doc_tokens = all_doc_tokens[:max_query_length - 1]
-        all_doc_tokens.append("[SEP]")
+            all_doc_tokens = all_doc_tokens[:max_query_length - 1]  # 截断长度超过 max_query_length 的 all_doc_tokens
+        all_doc_tokens.append("[SEP]")  # 添加句子结束标志
 
         for (i, token) in enumerate(example.doc_tokens):    
-            orig_to_tok_index.append(len(all_doc_tokens))  
+            orig_to_tok_index.append(len(all_doc_tokens))  # 记录原始词到分词后词的索引
             sub_tokens = tokenizer.tokenize(token)
             for sub_token in sub_tokens:
-                tok_to_orig_index.append(i)    
+                tok_to_orig_index.append(i)    # 记录分词后词到原始词的索引
                 all_doc_tokens.append(sub_token)
-            orig_to_tok_back_index.append(len(all_doc_tokens) - 1)  
+            orig_to_tok_back_index.append(len(all_doc_tokens) - 1)  # 记录原始词结束的索引
 
 
 
         def relocate_tok_span(orig_start_position, orig_end_position, orig_text):
-           
+           # 重新定位分词后的答案位置
             if orig_start_position is None:  
                 return 0, 0
 
@@ -302,24 +304,24 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length, max_query_
         ans_start_position, ans_end_position = [], []
         for ans_start_pos, ans_end_pos in zip(example.start_position, example.end_position):  
             s_pos, e_pos = relocate_tok_span(ans_start_pos, ans_end_pos, example.orig_answer_text)
-            ans_start_position.append(s_pos)  
-            ans_end_position.append(e_pos)
+            ans_start_position.append(s_pos)  # 添加答案起始位置
+            ans_end_position.append(e_pos)  # 添加答案结束位置
 
         
 
         for sent_span in example.sent_start_end_position:   
             if sent_span[0] >= len(orig_to_tok_index) or sent_span[0] >= sent_span[1]:
-                continue  
+                continue  # 忽略无效的句子范围
             sent_start_position = orig_to_tok_index[sent_span[0]] 
             sent_end_position = orig_to_tok_back_index[sent_span[1]] 
-            sentence_spans.append((sent_start_position, sent_end_position)) 
+            sentence_spans.append((sent_start_position, sent_end_position))     # 添加句子范围
 
         
 
         
         all_doc_tokens = all_doc_tokens[:max_seq_length - 1] + ["[SEP]"]
-        doc_input_ids = tokenizer.convert_tokens_to_ids(all_doc_tokens)
-        query_input_ids = tokenizer.convert_tokens_to_ids(query_tokens)
+        doc_input_ids = tokenizer.convert_tokens_to_ids(all_doc_tokens)     # 转换为 ID
+        query_input_ids = tokenizer.convert_tokens_to_ids(query_tokens)     # 转换为 ID
 
         doc_input_mask = [1] * len(doc_input_ids)
         doc_segment_ids = [0] * len(query_input_ids) + [1] * (len(doc_input_ids) - len(query_input_ids))
@@ -345,14 +347,14 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length, max_query_
         assert len(query_input_mask) == max_query_length
         assert len(query_segment_ids) == max_query_length
 
-        sentence_spans = get_valid_spans(sentence_spans, max_seq_length)
+        sentence_spans = get_valid_spans(sentence_spans, max_seq_length)    # 获取有效的句子范围
        
 
         sup_fact_ids = example.sup_fact_id
         sent_num = len(sentence_spans)
         sup_fact_ids = [sent_id for sent_id in sup_fact_ids if sent_id < sent_num]
         if len(sup_fact_ids) != len(example.sup_fact_id):
-            failed += 1
+            failed += 1     # 统计支持事实ID转换失败的例子数量
         if example.qas_id <10:
             print("qid {}".format(example.qas_id))
             print("all_doc_tokens {}".format(all_doc_tokens))
@@ -387,15 +389,15 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length, max_query_
                           start_position=ans_start_position,
                           end_position=ans_end_position)
         )
-    return features
+    return features     # 返回所有转换后的特征
 
-
+# 获取有效的跨度
 def _largest_valid_index(spans, limit):
     for idx in range(len(spans)):
         if spans[idx][1] >= limit:
             return idx
 
-
+# 获取有效的跨度列表
 def get_valid_spans(spans, limit):
     new_spans = []
     for span in spans:
@@ -408,7 +410,7 @@ def get_valid_spans(spans, limit):
             break
     return new_spans
 
-
+# 改进答案的标记跨度
 def _improve_answer_span(doc_tokens, input_start, input_end, tokenizer,
                          orig_answer_text):
     """Returns tokenized answer spans that better match the annotated answer."""
