@@ -8,6 +8,7 @@ import gzip
 import pickle
 from tqdm import tqdm
 from transformers import BertTokenizer
+import os
 
 
 
@@ -440,6 +441,11 @@ if __name__ == '__main__':
 
 
     args = parser.parse_args()
+
+    # 创建输出文件的目录
+    os.makedirs(os.path.dirname(args.example_output), exist_ok=True)
+    os.makedirs(os.path.dirname(args.feature_output), exist_ok=True)
+
     tokenizer = BertTokenizer.from_pretrained(args.tokenizer_path)
     examples = read_examples( full_file=args.full_data)
     with gzip.open(args.example_output, 'wb') as fout:

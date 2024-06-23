@@ -3,3 +3,5 @@
 /3 情感分析案例/data/wiki-news-300d-1M.vec
 /4 预训练模型应用实例/checkpoint
 /4 预训练模型应用实例/log
+/5 法律智能问答案例/output
+/5 法律智能问答案例/models
